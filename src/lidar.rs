@@ -109,12 +109,10 @@ impl<R: AsyncRead + Unpin> D300<R> {
 
     fn as_scan_line_stream(&mut self) -> Pin<Box<dyn Stream<Item = AngledScanLine> + '_>> {
         Box::pin(self.as_frame_stream().flat_map(|frame: Frame| {
-            futures::stream::iter(frame.data.into_iter()).boxed()
+            futures::stream::iter(frame.data).boxed()
         }))
     }
 
-    // TODO: remove when type miss match false positive is resolved
-    //noinspection RsTypeCheck
     fn frame_in(&mut self, rotations: usize) -> Pin<Box<dyn Stream<Item = Vec<AngledScanLine>> + '_>> {
         let mut line_buffer: Vec<AngledScanLine> = Vec::new();
         let mut covered_angle = 0.0;
@@ -129,7 +127,7 @@ impl<R: AsyncRead + Unpin> D300<R> {
             line_buffer.append(&mut frame.data);
 
             if covered_angle >= rotations as f64 * 360.0 {
-                ready(Some(line_buffer.drain(..).collect()))
+                ready(Some(std::mem::take(&mut line_buffer)))
             } else {
                 ready(None)
             }
